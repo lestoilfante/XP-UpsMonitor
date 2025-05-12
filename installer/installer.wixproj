@@ -1,0 +1,20 @@
+﻿<Project Sdk="WixToolset.Sdk/4.0.6">
+  <PropertyGroup>
+    <DebugType>none</DebugType>
+    <OutputPath>bin\</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <HarvestDirectory Include="..\src\bin\release">
+      <ComponentGroupName>HarvestedComponents</ComponentGroupName>
+      <DirectoryRefId>INSTALLFOLDER</DirectoryRefId>
+      <SuppressRootDirectory>true</SuppressRootDirectory>
+      <SuppressCom>true</SuppressCom>
+      <SuppressRegistry>true</SuppressRegistry>
+    </HarvestDirectory>
+    <BindPath Include="..\src\bin\release" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Heat" Version="4.0.6" />
+    <PackageReference Include="WixToolset.UI.wixext" Version="4.0.6" />
+  </ItemGroup>
+</Project>

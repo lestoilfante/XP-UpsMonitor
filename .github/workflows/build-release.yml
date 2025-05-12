@@ -1,0 +1,116 @@
+name: Build and Release MSI
+on:
+  push:
+    tags:
+      - 'v*'
+jobs:
+  build:
+    name: Build MSI
+    runs-on: windows-latest
+    
+    env:
+      SOLUTION_PATH: src/UpsMonitor.sln
+      BUILD_OUTPUT_PATH: src/bin/release
+      INSTALLER_PROJECT: installer/installer.wixproj
+      INSTALLER_PREFIX: XP-UpsMonitor
+
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      msi_filename: ${{ steps.set_msi_filename.outputs.msi_filename }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.3
+        
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v1.2.0
+        
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag -replace '^v', ''
+          echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          
+      - name: Build solution
+        run: msbuild -restore ${{ env.SOLUTION_PATH }} /p:Configuration=Release /p:TargetFrameworkVersion=v4.8 /p:Platform="Any CPU" /p:Version=${{ steps.get_version.outputs.version }}
+
+      - name: Create license file for MSI deployment
+        run: |
+          $absoluteBuildDir = Join-Path -Path "${{ github.workspace }}" -ChildPath "${{ env.BUILD_OUTPUT_PATH }}"
+          $licenseFile = "LICENSE.txt"
+          $rtfFile = "LICENSE.rtf"
+          if (-not (Test-Path $licenseFile)) {
+            Write-Error "LICENSE.txt file not found. Please check the path."
+            exit 1
+          }
+          # Copy license file to build directory before harvesting
+          Copy-Item "$licenseFile" -Destination "$absoluteBuildDir"
+          # Create LICENSE.rtf from txt for MSI UI Control
+          $plainText = Get-Content -Path $licenseFile -Raw
+          $escapedText = $plainText -replace '\\', '\\\\' -replace '{', '\{' -replace '}', '\}'
+          $rtfFormattedText = $escapedText -replace "`r?`n", '\par '
+          $rtfContent = "{\rtf1\ansi\deff0`r`n\pard`r`n$rtfFormattedText`r`n}"
+          Set-Content -Path $rtfFile -Value $rtfContent -Encoding ASCII
+  
+      - name: Set MSI filename
+        id: set_msi_filename
+        run: |
+          $msiFilename = "${{ env.INSTALLER_PREFIX }}-v${{ steps.get_version.outputs.version }}.msi"
+          echo "msi_filename=$msiFilename " | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Build MSI package from WIX project
+        shell: powershell
+        run: |
+          # Update package version in WIX project
+          $packageFilePath = Split-Path -Path "${{ env.INSTALLER_PROJECT }}" -Parent
+          $packageFile = Join-Path -Path $packageFilePath -ChildPath "Package.wxs"
+          if (-not (Test-Path $packageFile)) {
+            Write-Error "Package.wxs file not found. Please check the path."
+            exit 1
+          }
+          $xml = [xml](Get-Content -Path $packageFile)
+          $xml.Wix.Package.Version = "${{ steps.get_version.outputs.version }}"
+          # Fix license file path
+          $licenseVar = $xml.Wix.Package.WixVariable | Where-Object { $_.Id -eq "WixUILicenseRtf" }
+          if ($licenseVar) {
+            $licenseVar.SetAttribute("Value", (Join-Path -Path "${{ github.workspace }}" -ChildPath "LICENSE.rtf"))
+          }
+          $xml.Save($packageFile)
+          # Build the MSI package
+          msbuild -restore "${{ env.INSTALLER_PROJECT }}" /p:Configuration=Release /p:Platform=x64
+          # 
+          Copy-Item -Path "$packageFilePath\bin\installer.msi" -Destination "${{ github.workspace }}\${{ steps.set_msi_filename.outputs.msi_filename }}" -Force
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-package
+          path: ${{ steps.set_msi_filename.outputs.msi_filename }}
+          
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+        contents: write
+    
+    steps:
+      - name: Download MSI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: msi-package
+          
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ needs.build.outputs.version }}
+          files: ${{ needs.build.outputs.msi_filename }}
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}

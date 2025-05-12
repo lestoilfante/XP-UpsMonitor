@@ -1,0 +1,19 @@
+﻿<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="XP-UpsMonitor" Manufacturer="https://github.com/lestoilfante" Version="0.99" UpgradeCode="afa0fa04-ea1c-49dd-89da-d59af6e13f49" Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <SummaryInformation Description="UpsMonitor for Milestone XProtect" />
+    <Feature Id="Main">
+      <ComponentGroupRef Id="HarvestedComponents" />
+    </Feature>
+    <MediaTemplate EmbedCab="yes"/>
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="Milestone" Name="Milestone">
+        <Directory Id="MIPPlugins" Name="MIPPlugins">
+          <Directory Id="INSTALLFOLDER" Name="!(bind.Property.ProductName)" />
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="..\src\bin\release\LICENSE.rtf" />
+  </Package>
+</Wix>
