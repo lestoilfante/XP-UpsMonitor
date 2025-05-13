@@ -12,7 +12,6 @@ namespace UpsMonitor.Common
         public static Guid BackgroundPluginId = new Guid("7f751baf-71f7-4805-850c-5b517b611b3e");
         public static Guid CtrlKindId = new Guid("7d73286c-f0c0-4528-8e7a-b5a0cc119d17");
         public static Guid PropertyPollIntervalId = new Guid("2c31af59-7f22-4a03-81db-7478fe7f44f5");
-        public const string VersionString = "1.0.0.0";
         public const string LicenseString = "Base-License";
         public const string LicenseFreeString = "Free-License";
         public const int DefaultPollInterval = 60;
